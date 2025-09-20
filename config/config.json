@@ -1,0 +1,35 @@
+{
+  "api_settings": {
+    "quality": "medium",
+    "input_fidelity": "high",
+    "timeout": 120,
+    "ultra_precision_mode": true
+  },
+  "image_processing": {
+    "auto_padding": true,
+    "background_color_detection": true,
+    "aspect_ratio_optimization": true
+  },
+  "ui_settings": {
+    "clipboard_check_interval": 500,
+    "notification_duration": 3000,
+    "window_stays_on_top": true,
+    "max_display_width": 1400,
+    "max_display_height": 1000
+  },
+  "output_settings": {
+    "auto_save": true,
+    "save_directory": "images",
+    "filename_format": "translated_{timestamp}.png"
+  },
+  "prompt_settings": {
+    "use_emoji_markers": true,
+    "precision_level": "ultra",
+    "language_pair": "ja_to_en"
+  },
+  "debug_settings": {
+    "log_level": "INFO",
+    "detailed_logging": true,
+    "save_padded_images": false
+  }
+}
