@@ -1,4 +1,8 @@
 {
+  "translation_settings": {
+    "from_language": "japanese",
+    "to_language": "tagalog"
+  },
   "api_settings": {
     "quality": "medium",
     "input_fidelity": "high",
