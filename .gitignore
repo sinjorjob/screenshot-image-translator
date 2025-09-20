@@ -1,16 +1,13 @@
-# 環境変数ファイル（APIキーを含む）
+# Environment variables
 .env
 
-# Python
+# Python cache
 __pycache__/
 *.py[cod]
 *$py.class
-*.so
+
+# Distribution / packaging
 .Python
-env/
-venv/
-.venv/
-ENV/
 build/
 develop-eggs/
 dist/
@@ -26,27 +23,47 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+PIPFILE.lock
 
-# IDE
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# Generated images and logs
+images/
+logs/
+
+# IDE files
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
 
-# OS
+# OS files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
-desktop.ini
 
-# 実行時に生成されるフォルダ
-images/
-logs/
-
-# assetsフォルダは管理対象（アイコンなどの静的リソース）
-!source/assets/
-
-# 設定ファイルは管理対象
-!config/
-
-# ドキュメントは管理対象
-!docs/.claude/
+# Claude Code development settings
+.claude/
