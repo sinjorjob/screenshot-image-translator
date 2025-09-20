@@ -49,4 +49,4 @@ logs/
 !config/
 
 # ドキュメントは管理対象
-!docs/
+!docs/.claude/
