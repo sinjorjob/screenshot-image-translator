@@ -30,6 +30,26 @@ from dotenv import load_dotenv
 project_root = Path(__file__).parent.parent
 load_dotenv(project_root / '.env')
 
+# 言語マッピング定義
+LANGUAGE_MAP = {
+    'japanese': {'display': '日本語', 'api': 'Japanese'},
+    'english': {'display': '英語', 'api': 'English'},
+    'chinese_simplified': {'display': '中国語簡体字', 'api': 'Simplified Chinese'},
+    'chinese_traditional': {'display': '中国語繁体字', 'api': 'Traditional Chinese'},
+    'korean': {'display': '韓国語', 'api': 'Korean'},
+    'tagalog': {'display': 'タガログ語', 'api': 'Tagalog'},
+    'spanish': {'display': 'スペイン語', 'api': 'Spanish'},
+    'french': {'display': 'フランス語', 'api': 'French'},
+    'german': {'display': 'ドイツ語', 'api': 'German'},
+    'portuguese': {'display': 'ポルトガル語', 'api': 'Portuguese'},
+    'italian': {'display': 'イタリア語', 'api': 'Italian'},
+    'russian': {'display': 'ロシア語', 'api': 'Russian'},
+    'arabic': {'display': 'アラビア語', 'api': 'Arabic'},
+    'hindi': {'display': 'ヒンディー語', 'api': 'Hindi'},
+    'thai': {'display': 'タイ語', 'api': 'Thai'},
+    'vietnamese': {'display': 'ベトナム語', 'api': 'Vietnamese'}
+}
+
 
 def setup_logger():
     """ログ設定"""
@@ -128,6 +148,10 @@ def load_config():
 
     # デフォルト設定
     default_config = {
+        "translation_settings": {
+            "from_language": "japanese",
+            "to_language": "english"
+        },
         "api_settings": {
             "quality": "medium",
             "input_fidelity": "high",
@@ -197,17 +221,22 @@ class TranslationThread(QThread):
     """画像翻訳を実行する別スレッド"""
     finished = pyqtSignal(Image.Image)
     error = pyqtSignal(str)
+    progress = pyqtSignal(str)  # 進捗状況通知用
 
-    def __init__(self, image, config):
+    def __init__(self, image, config, from_language, to_language):
         super().__init__()
         self.image = image
         self.config = config
+        self.from_language = from_language
+        self.to_language = to_language
         self.api_key = os.getenv('OPENAI_API_KEY')
         self.logger = logging.getLogger('ImageTranslator.TranslationThread')
 
     def run(self):
         """翻訳処理を実行"""
-        self.logger.info("翻訳処理開始")
+        self.logger.info(f"翻訳処理開始: {LANGUAGE_MAP[self.from_language]['display']} → {LANGUAGE_MAP[self.to_language]['display']}")
+        self.progress.emit(f"{LANGUAGE_MAP[self.from_language]['display']}から{LANGUAGE_MAP[self.to_language]['display']}への翻訳を開始...")
+
         try:
             # メイン方式で翻訳を試行
             translated_image = self.translate_image(self.image)
@@ -216,6 +245,7 @@ class TranslationThread(QThread):
                 self.finished.emit(translated_image)
             else:
                 self.logger.warning("メイン翻訳に失敗、フォールバック方式を試行")
+                self.progress.emit("別の方法で翻訳を試行中...")
                 # フォールバック方式を試行
                 translated_image = self.translate_image_fallback(self.image)
                 if translated_image:
@@ -223,7 +253,7 @@ class TranslationThread(QThread):
                     self.finished.emit(translated_image)
                 else:
                     self.logger.warning("すべての翻訳方式に失敗しました")
-                    self.error.emit("翻訳に失敗しました")
+                    self.error.emit("翻訳に失敗しました。APIキーまたはネットワーク接続を確認してください。")
         except Exception as e:
             self.logger.error(f"翻訳エラー: {str(e)}", exc_info=True)
             self.error.emit(f"エラー: {str(e)}")
@@ -360,6 +390,10 @@ class TranslationThread(QThread):
         """レイアウト保持に特化した最適化プロンプト（パディング対応）を生成"""
         width, height = original_size
 
+        # API用の英語言語名を取得
+        from_lang = LANGUAGE_MAP[self.from_language]['api']
+        to_lang = LANGUAGE_MAP[self.to_language]['api']
+
         # パディング情報に基づくプロンプト調整
         padding_instructions = ""
         if padding_info['type'] == 'vertical':
@@ -384,14 +418,24 @@ class TranslationThread(QThread):
         elif target_size == "1024x1536":
             aspect_info = "この縦長の画像において、"
 
+        # 言語名の翻訳例を追加
+        lang_example = ""
+        if self.from_language == 'japanese' and self.to_language == 'tagalog':
+            lang_example = """
+🔍 【重要な翻訳例】:
+画像内に「中国語」という文字がある場合 → 「wikang Tsino」に翻訳
+画像内に「韓国語」という文字がある場合 → 「wikang Koreano」に翻訳
+つまり、言語名も意味を理解して適切に翻訳してください。文字列の単純置換ではありません。
+"""
+
         # 超強化アイコン保護プロンプト
         optimized_prompt = f"""
-🔒 PHOTOCOPY MODE: この画像を【工業用スキャナーで完璧複製】- 日本語文字のみ英語変換 🔒
+🔒 PHOTOCOPY MODE: この画像を【工業用スキャナーで完璧複製】- {from_lang}で書かれたテキスト部分のみを{to_lang}に翻訳 🔒
 
-🖨️ 【PHOTOCOPY DIRECTIVE】: オフィスのコピー機で書類をコピーするように、この画像を完璧にコピーしてください。コピー機は文字だけを変えて、他の全ての要素（アイコン、色、レイアウト、デザイン）は1ピクセルも変更しません。
+🖨️ 【PHOTOCOPY DIRECTIVE】: オフィスのコピー機で書類をコピーするように、この画像を完璧にコピーしてください。コピー機は{from_lang}で書かれたテキスト部分のみを{to_lang}に翻訳し、他の全ての要素（アイコン、色、レイアウト、デザイン）は1ピクセルも変更しません。
 {padding_instructions}
-
-{aspect_info}この画像の【写真品質の完全複製】を作成し、日本語テキストのみを英語に置き換えてください。
+{lang_example}
+{aspect_info}この画像の【写真品質の完全複製】を作成し、{from_lang}で書かれているテキスト部分のみを{to_lang}に翻訳してください。
 
 ⚠️ 【ABSOLUTE FREEZE ZONES - 絶対変更禁止領域】⚠️
 
@@ -421,22 +465,23 @@ class TranslationThread(QThread):
 ❌ 文字色変更 FORBIDDEN
 ❌ 文字背景色変更 FORBIDDEN
 ❌ 文字エフェクト変更 FORBIDDEN
-✅ 日本語の色を英語でも【完全同一】使用
+✅ {from_lang}テキストの色を{to_lang}翻訳テキストでも【完全同一】使用
 
 📝 【TRANSLATION ZONE - 翻訳許可領域】📝
-✅ 日本語文字 → 英語文字への変換のみ許可
-✅ 文字の内容変更のみ許可
+✅ {from_lang}で書かれたテキスト部分を{to_lang}に翻訳することのみ許可
+✅ テキストの意味を理解した自然な翻訳のみ許可（文字列置換禁止）
+✅ 言語名も適切に翻訳する（例：「日本語」→「wikang Hapon」）
 ✅ その他の変更は一切禁止
 
 🎯 【EXECUTION COMMAND】:
 1. 元画像を【スキャナーで取り込んだような完璧さ】で複製
-2. 日本語文字を見つけて【その位置・色・スタイルを保持】しながら英語に変換
+2. {from_lang}で書かれたテキスト部分を見つけて【その位置・色・スタイルを保持】しながら{to_lang}に翻訳
 3. アイコン、ボタン、色、レイアウトは【1ピクセルも変更せず】保持
 4. 「元画像と見分けがつかない」レベルの複製品質で作成
 
 ⚡ この指示を【絶対に遵守】してください。アイコンやデザインの変更は【完全に禁止】です。
 
-🖨️ 【FINAL REMINDER】: あなたは今、高性能コピー機です。原稿（元画像）を見て、文字だけを変換した完璧なコピーを作成してください。コピー機がアイコンや色を変えることはありません。
+🖨️ 【FINAL REMINDER】: あなたは今、高性能コピー機です。原稿（元画像）を見て、{from_lang}で書かれた文字部分のみを{to_lang}に翻訳した完璧なコピーを作成してください。コピー機がアイコンや色を変えることはありません。
         """.strip()
 
         self.logger.debug(f"最適化プロンプト生成完了 (長さ: {len(optimized_prompt)}文字)")
@@ -553,6 +598,7 @@ class TranslationThread(QThread):
             self.logger.debug(f"送信データ: {data}")
             self.logger.debug(f"ファイル数: {len(files)}")
 
+            self.progress.emit(f"AIに翻訳を依頼中... (最大{timeout}秒)")
             response = requests.post(
                 "https://api.openai.com/v1/images/edits",
                 headers=headers,
@@ -626,6 +672,10 @@ class TranslationThread(QThread):
         """フォールバック: 画像生成APIを使用して翻訳"""
         self.logger.info("フォールバック方式で翻訳を試行")
 
+        # API用の英語言語名を取得
+        from_lang = LANGUAGE_MAP[self.from_language]['api']
+        to_lang = LANGUAGE_MAP[self.to_language]['api']
+
         # 画像を一時的にbase64エンコード
         img_buffer = BytesIO()
         image.save(img_buffer, format="PNG")
@@ -637,18 +687,25 @@ class TranslationThread(QThread):
             "Content-Type": "application/json"
         }
 
-        # 高精度フォールバック用プロンプト
-        prompt = """🎯 ULTRA-PRECISE GENERATION:
-この画像と【完全に同一】のレイアウト・デザインで、日本語テキストのみを英語に翻訳した画像を生成してください。
+        # フォールバック用の言語例も生成
+        fallback_lang_example = ""
+        if self.from_language == 'japanese' and self.to_language == 'tagalog':
+            fallback_lang_example = """
+🔍 【重要】: 画像内の「中国語」→「wikang Tsino」のように、言語名も意味を理解して翻訳してください。
+"""
 
+        # 高精度フォールバック用プロンプト
+        prompt = f"""🎯 ULTRA-PRECISE GENERATION:
+この画像と【完全に同一】のレイアウト・デザインで、{from_lang}で書かれているテキスト部分のみを{to_lang}に翻訳した画像を生成してください。
+{fallback_lang_example}
 【厳密保持要件】:
 🎨 色彩: 背景色、アイコン色、境界線色を【RGB値レベル】で完全維持
 🖼️ デザイン: アイコン、ボタン、UI要素のデザインを【1ピクセル単位】で保持
-📝 テキスト色: 日本語の文字色を英語テキストでも【完全に同一色】で使用
+📝 テキスト色: {from_lang}テキストの文字色を{to_lang}翻訳テキストでも【完全に同一色】で使用
 📐 レイアウト: 要素の位置、サイズ、間隔を【ミリメートル精度】で保持
 ✨ エフェクト: 影、グラデーション、ハイライトを【元と同一】で再現
 
-日本語文字を自然な英語に翻訳し、他のすべての要素は【写真的に同一】にしてください。"""
+{from_lang}で書かれた文字部分を意味を理解して自然な{to_lang}に翻訳し、他のすべての要素は【写真的に同一】にしてください。"""
 
         data = {
             "model": "gpt-image-1",
@@ -825,9 +882,14 @@ class ImageTranslatorApp(QWidget):
         self.last_image_hash = None
         self.result_window = ResultWindow()
         self.translation_thread = None
+        self.config = app_config
 
         # 自動翻訳機能の状態（デフォルトOFF）
         self.auto_translation_enabled = False
+
+        # 翻訳言語設定の初期化
+        self.from_language = self.config.get('translation_settings', {}).get('from_language', 'japanese')
+        self.to_language = self.config.get('translation_settings', {}).get('to_language', 'english')
 
         # システムトレイ初期化
         self.init_system_tray()
@@ -875,27 +937,9 @@ class ImageTranslatorApp(QWidget):
         self.tray_icon.setIcon(self.off_icon)
 
         # トレイメニュー
-        tray_menu = QMenu()
-
-        # 自動翻訳ON/OFF切り替え機能を追加
-        self.translation_action = QAction("🔴 自動翻訳: OFF", self)
-        self.translation_action.triggered.connect(self.toggle_auto_translation)
-        tray_menu.addAction(self.translation_action)
-
-        tray_menu.addSeparator()  # セパレーター追加
-
-        # テスト表示機能を追加
-        test_action = QAction("📸 画像表示テスト", self)
-        test_action.triggered.connect(self.test_image_display)
-        tray_menu.addAction(test_action)
-
-        tray_menu.addSeparator()  # セパレーター追加
-
-        quit_action = QAction("終了", self)
-        quit_action.triggered.connect(self.quit_app)
-        tray_menu.addAction(quit_action)
-
-        self.tray_icon.setContextMenu(tray_menu)
+        self.tray_menu = QMenu()
+        self.create_tray_menu()
+        self.tray_icon.setContextMenu(self.tray_menu)
         self.tray_icon.setToolTip("画像翻訳ツール - 自動翻訳: OFF")
         self.tray_icon.show()
 
@@ -907,6 +951,112 @@ class ImageTranslatorApp(QWidget):
                 QSystemTrayIcon.Information,
                 2000
             )
+
+    def create_tray_menu(self):
+        """トレイメニューを作成（再構築可能）"""
+        self.tray_menu.clear()
+
+        # 自動翻訳ON/OFF切り替え機能
+        self.translation_action = QAction("🔴 自動翻訳: OFF" if not self.auto_translation_enabled else "🟢 自動翻訳: ON", self)
+        self.translation_action.triggered.connect(self.toggle_auto_translation)
+        self.tray_menu.addAction(self.translation_action)
+
+        self.tray_menu.addSeparator()
+
+        # 翻訳設定サブメニュー
+        translation_menu = self.tray_menu.addMenu("📝 翻訳設定")
+
+        # FROM言語サブメニュー
+        from_menu = translation_menu.addMenu("翻訳元言語 (From)")
+        self.create_language_menu(from_menu, 'from')
+
+        # TO言語サブメニュー
+        to_menu = translation_menu.addMenu("翻訳先言語 (To)")
+        self.create_language_menu(to_menu, 'to')
+
+        # 現在の設定表示
+        translation_menu.addSeparator()
+        current_setting = translation_menu.addAction(
+            f"現在: {LANGUAGE_MAP[self.from_language]['display']} → {LANGUAGE_MAP[self.to_language]['display']}"
+        )
+        current_setting.setEnabled(False)
+
+        self.tray_menu.addSeparator()
+
+        # テスト表示機能
+        test_action = QAction("📸 画像表示テスト", self)
+        test_action.triggered.connect(self.test_image_display)
+        self.tray_menu.addAction(test_action)
+
+        self.tray_menu.addSeparator()
+
+        # 終了
+        quit_action = QAction("終了", self)
+        quit_action.triggered.connect(self.quit_app)
+        self.tray_menu.addAction(quit_action)
+
+    def create_language_menu(self, parent_menu, direction):
+        """言語選択メニューを作成"""
+        current_lang = self.from_language if direction == 'from' else self.to_language
+
+        for lang_key, lang_info in LANGUAGE_MAP.items():
+            # FROMとTOが同じ言語にならないようチェック
+            if direction == 'from' and lang_key == self.to_language:
+                action = QAction(f"  {lang_info['display']} (使用不可)", self)
+                action.setEnabled(False)
+            elif direction == 'to' and lang_key == self.from_language:
+                action = QAction(f"  {lang_info['display']} (使用不可)", self)
+                action.setEnabled(False)
+            else:
+                # 現在選択中の言語にチェックマーク
+                if lang_key == current_lang:
+                    action = QAction(f"✓ {lang_info['display']}", self)
+                else:
+                    action = QAction(f"  {lang_info['display']}", self)
+
+                # ラムダ式を使ってクロージャを作成
+                action.triggered.connect(lambda checked, l=lang_key, d=direction: self.change_language(l, d))
+
+            parent_menu.addAction(action)
+
+    def change_language(self, language_key, direction):
+        """言語設定を変更"""
+        if direction == 'from':
+            self.from_language = language_key
+            self.config['translation_settings']['from_language'] = language_key
+        else:
+            self.to_language = language_key
+            self.config['translation_settings']['to_language'] = language_key
+
+        # 設定ファイルを保存
+        self.save_config()
+
+        # メニューを再構築
+        self.create_tray_menu()
+
+        # 通知表示
+        if self.tray_icon.isSystemTrayAvailable():
+            self.tray_icon.showMessage(
+                "翻訳設定変更",
+                f"{LANGUAGE_MAP[self.from_language]['display']} → {LANGUAGE_MAP[self.to_language]['display']}",
+                QSystemTrayIcon.Information,
+                2000
+            )
+
+        self.logger.info(f"翻訳設定変更: {self.from_language} → {self.to_language}")
+
+    def save_config(self):
+        """設定をファイルに保存"""
+        try:
+            project_root = Path(__file__).parent.parent
+            config_path = project_root / "config" / "config.json"
+
+            with open(config_path, 'w', encoding='utf-8') as f:
+                json.dump(self.config, f, ensure_ascii=False, indent=2)
+
+            self.logger.info("設定ファイル保存完了")
+        except Exception as e:
+            self.logger.error(f"設定ファイル保存エラー: {str(e)}")
 
     def update_current_clipboard_hash(self):
         """現在のクリップボード画像のハッシュを更新（古い画像を処理しないため）"""
@@ -1002,9 +1152,10 @@ class ImageTranslatorApp(QWidget):
             return
 
         # 翻訳スレッド開始
-        self.translation_thread = TranslationThread(image, app_config)
+        self.translation_thread = TranslationThread(image, app_config, self.from_language, self.to_language)
         self.translation_thread.finished.connect(self.on_translation_finished)
         self.translation_thread.error.connect(self.on_translation_error)
+        self.translation_thread.progress.connect(self.on_translation_progress)
         self.translation_thread.start()
 
     def on_translation_finished(self, translated_image):
@@ -1054,12 +1205,34 @@ class ImageTranslatorApp(QWidget):
             self.logger.error(f"翻訳画像保存エラー: {str(e)}", exc_info=True)
             return "保存失敗"
 
+    def on_translation_progress(self, message):
+        """翻訳進捗通知の処理"""
+        self.logger.info(f"進捗: {message}")
+
+        # システムトレイ通知
+        if self.tray_icon.isSystemTrayAvailable():
+            self.tray_icon.showMessage(
+                "翻訳処理中",
+                message,
+                QSystemTrayIcon.Information,
+                2000
+            )
+
     def on_translation_error(self, error_message):
         """翻訳エラー時の処理"""
         self.logger.error(f"翻訳エラー: {error_message}")
 
+        # システムトレイ通知
+        if self.tray_icon.isSystemTrayAvailable():
+            self.tray_icon.showMessage(
+                "翻訳エラー",
+                f"エラーが発生しました:\n{error_message}",
+                QSystemTrayIcon.Critical,
+                5000
+            )
+
         # エラーダイアログ表示
-        QMessageBox.critical(None, "エラー", error_message)
+        QMessageBox.critical(None, "翻訳エラー", f"翻訳処理中にエラーが発生しました:\n\n{error_message}")
 
     def test_image_display(self):
         """画像表示テスト機能"""
