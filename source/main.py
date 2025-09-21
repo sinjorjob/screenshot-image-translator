@@ -235,7 +235,7 @@ class TranslationThread(QThread):
     def run(self):
         """翻訳処理を実行"""
         self.logger.info(f"翻訳処理開始: {LANGUAGE_MAP[self.from_language]['display']} → {LANGUAGE_MAP[self.to_language]['display']}")
-        self.progress.emit(f"{LANGUAGE_MAP[self.from_language]['display']}から{LANGUAGE_MAP[self.to_language]['display']}への翻訳を開始...")
+        self.progress.emit(f"{LANGUAGE_MAP[self.from_language]['display']}→{LANGUAGE_MAP[self.to_language]['display']}で翻訳を開始")
 
         try:
             # メイン方式で翻訳を試行
@@ -426,6 +426,7 @@ class TranslationThread(QThread):
 画像内に「中国語」という文字がある場合 → 「wikang Tsino」に翻訳
 画像内に「韓国語」という文字がある場合 → 「wikang Koreano」に翻訳
 つまり、言語名も意味を理解して適切に翻訳してください。文字列の単純置換ではありません。
+
 """
 
         # 超強化アイコン保護プロンプト
@@ -598,7 +599,7 @@ class TranslationThread(QThread):
             self.logger.debug(f"送信データ: {data}")
             self.logger.debug(f"ファイル数: {len(files)}")
 
-            self.progress.emit(f"AIに翻訳を依頼中... (最大{timeout}秒)")
+            self.progress.emit(f"AIに翻訳を依頼中...")
             response = requests.post(
                 "https://api.openai.com/v1/images/edits",
                 headers=headers,
