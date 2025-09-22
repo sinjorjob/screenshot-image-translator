@@ -2,6 +2,10 @@
 
 16言語間で画像内テキストを自動翻訳するWindowsデスクトップアプリケーション
 
+## デモ動画
+
+[画像翻訳デモ](https://www.youtube.com/watch?v=gLH2hN_oXeA)
+
 ## 📁 プロジェクト構成
 
 ```
